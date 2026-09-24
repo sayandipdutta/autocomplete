@@ -1,6 +1,6 @@
 import sys
 from threading import Lock
-from typing import Dict, Union  # ruff:ignore[deprecated-import]
+from typing import Dict, List, Union  # ruff:ignore[deprecated-import]
 
 
 class Trie:
@@ -47,7 +47,7 @@ class Trie:
             return None
         return child
 
-    def prefix_matches(self, prefix: str) -> list[str]:
+    def prefix_matches(self, prefix: str) -> List[str]:  # ruff:ignore[non-pep585-annotation]
         node = self.find_substr(prefix, complete=False)
         matches = []
         if node is not None:
@@ -94,7 +94,7 @@ class WordStore:
     def node_count(self) -> int:
         return self._root.node_count
 
-    def prefix_matches(self, prefix: str) -> list[str]:
+    def prefix_matches(self, prefix: str) -> List[str]:  # ruff:ignore[non-pep585-annotation]
         return self._root.prefix_matches(prefix)
 
     def _inspect(self):
