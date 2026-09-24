@@ -37,19 +37,37 @@ class Trie:
             new_child.is_end = True
             return already_marked
 
-    def match_prefix(self, word: str) -> "Union[Trie, None]":  # ruff:ignore[non-pep604-annotation-union]
+    def find_substr(self, prefix: str, complete: bool = True) -> "Union[Trie, None]":  # ruff:ignore[non-pep604-annotation-union]
         child = self
-        for c in word:
+        for c in prefix:
             child = child.children.get(c)
             if not child:
                 return None
-        return child if child.is_end else None
+        if complete and not child.is_end:
+            return None
+        return child
+
+    def prefix_matches(self, prefix: str) -> list[str]:
+        node = self.find_substr(prefix, complete=False)
+        matches = []
+        if node is not None:
+            if node.is_end:
+                matches.append(prefix)
+            for choice in node.walk_words():
+                matches.append("".join((prefix, *choice)))
+        return matches
+
+    def walk_words(self):
+        for char, node in self.children.items():
+            if node.is_end:
+                yield char
+            yield from ((char, *word) for word in node.walk_words())
 
     def contains(self, word: str) -> bool:
-        return self.match_prefix(word) is not None
+        return self.find_substr(word) is not None
 
     def frequency(self, word: str) -> int:
-        return node.count if (node := self.match_prefix(word)) else 0
+        return node.count if (node := self.find_substr(word)) else 0
 
     def __repr__(self):
         return (
@@ -75,6 +93,9 @@ class WordStore:
 
     def node_count(self) -> int:
         return self._root.node_count
+
+    def prefix_matches(self, prefix: str) -> list[str]:
+        return self._root.prefix_matches(prefix)
 
     def _inspect(self):
         print(f"WordStore(_store={self._root}, nunique={self.num_uniques})")
@@ -106,13 +127,18 @@ for line in filter(None, map(str.strip, sys.stdin)):
     cmd, _, word = line.partition(" ")
     if cmd == "INSERT":
         words.insert(word)
-        # print("OK")
+        print("OK")
         # words._inspect()
-    # elif cmd == "CONTAINS":
-    #     print("YES" if words.contains(word) else "NO")
+    elif cmd == "CONTAINS":
+        print("YES" if words.contains(word) else "NO")
+    elif cmd == "PREFIX":
+        matches = words.prefix_matches(word)
+        print(",".join(matches) if matches else "none")
     elif cmd == "FREQ":
         print(words.frequency(word))
     elif cmd == "SIZE":
         print(words.num_uniques)
     elif cmd == "NODES":
         print(words.node_count())
+    elif cmd == "DEBUG":
+        words._inspect()
