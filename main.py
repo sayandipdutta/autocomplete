@@ -42,11 +42,11 @@ trie = Trie()
 #         out.append(str(size_count))
 
 for line in filter(None, map(str.strip, sys.stdin)):
-    match line.split(" ", maxsplit=1):
-        case "INSERT", word:
-            trie.insert(word)
-            print("OK")
-        case "CONTAINS", word:
-            print("YES" if trie.contains(word) else "NO")
-        case ("SIZE",):
-            print(f"{trie.size()}")
+    cmd, _, word = line.partition(" ")
+    if cmd == "INSERT" and word:
+        trie.insert(word)
+        print("OK")
+    elif cmd == "CONTAINS" and word:
+        print("YES" if trie.contains(word) else "NO")
+    elif cmd == "SIZE":
+        print(f"{trie.size()}")
