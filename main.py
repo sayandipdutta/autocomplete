@@ -5,7 +5,7 @@ class Trie:
     def __init__(self):
         self.children = {}
         self.is_end = False
-        self.words = set[str]()
+        self.words = set()
         self.word_count = 0
 
     def insert(self, word: str):
