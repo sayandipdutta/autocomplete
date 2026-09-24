@@ -1,25 +1,86 @@
 import sys
+from threading import Lock
+from typing import Dict, Union  # ruff:ignore[deprecated-import]
 
 
 class Trie:
     def __init__(self):
-        self.children = {}
+        self.children: Dict[str, Trie] = {}  # ruff:ignore[non-pep585-annotation]
         self.is_end = False
-        self.words = set()
-        self.word_count = 0
+        self.count = 0
+        self._num_nodes = 0
+        self.num_nodes_upto_date = True
+        self.lock = Lock()
 
-    def insert(self, word: str):
-        self.words.add(word)
-        self.word_count += 1
+    @property
+    def node_count(self) -> int:
+        with self.lock:
+            if not self.num_nodes_upto_date:
+                self._num_nodes = self._count_nodes()
+                self.num_nodes_upto_date = True
+            return self._num_nodes
+
+    def _count_nodes(self) -> int:
+        return sum(
+            (child._count_nodes() for child in self.children.values()),
+            start=len(self.children),
+        )
+
+    def insert(self, word: str) -> bool:
+        with self.lock:
+            self.num_nodes_upto_date = False
+            new_child = self
+            for c in word:
+                new_child = new_child.children.setdefault(c, Trie())
+                new_child.count += 1
+            already_marked = new_child.is_end
+            new_child.is_end = True
+            return already_marked
+
+    def match_prefix(self, word: str) -> "Union[Trie, None]":  # ruff:ignore[non-pep604-annotation-union]
+        child = self
+        for c in word:
+            child = child.children.get(c)
+            if not child:
+                return None
+        return child if child.is_end else None
 
     def contains(self, word: str) -> bool:
-        return word in self.words
+        return self.match_prefix(word) is not None
 
-    def size(self) -> int:
-        return self.word_count
+    def frequency(self, word: str) -> int:
+        return node.count if (node := self.match_prefix(word)) else 0
+
+    def __repr__(self):
+        return (
+            f"Trie(children={self.children}, is_end={self.is_end}, count={self.count})"
+        )
 
 
-trie = Trie()
+class WordStore:
+    def __init__(self):
+        self._root = Trie()
+        self.num_uniques = 0
+
+    def insert(self, word: str):
+        already_marked = self._root.insert(word)
+        if not already_marked:
+            self.num_uniques += 1
+
+    def contains(self, word: str):
+        return self._root.contains(word)
+
+    def frequency(self, word: str) -> int:
+        return self._root.frequency(word)
+
+    def node_count(self) -> int:
+        return self._root.node_count
+
+    def _inspect(self):
+        print(f"WordStore(_store={self._root}, nunique={self.num_uniques})")
+
+
+words = WordStore()
 
 # for raw in sys.stdin:
 #     line = raw.rstrip("\n")
@@ -43,10 +104,15 @@ trie = Trie()
 
 for line in filter(None, map(str.strip, sys.stdin)):
     cmd, _, word = line.partition(" ")
-    if cmd == "INSERT" and word:
-        trie.insert(word)
-        print("OK")
-    elif cmd == "CONTAINS" and word:
-        print("YES" if trie.contains(word) else "NO")
+    if cmd == "INSERT":
+        words.insert(word)
+        # print("OK")
+        # words._inspect()
+    # elif cmd == "CONTAINS":
+    #     print("YES" if words.contains(word) else "NO")
+    elif cmd == "FREQ":
+        print(words.frequency(word))
     elif cmd == "SIZE":
-        print(f"{trie.size()}")
+        print(words.num_uniques)
+    elif cmd == "NODES":
+        print(words.node_count())
