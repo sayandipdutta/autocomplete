@@ -58,7 +58,8 @@ class Trie:
         return matches
 
     def walk_words(self):
-        for char, node in self.children.items():
+        for char in sorted(self.children):
+            node = self.children[char]
             if node.is_end:
                 yield char
             yield from ((char, *word) for word in node.walk_words())
