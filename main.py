@@ -27,7 +27,7 @@ class Trie:
     def _count_nodes(self) -> int:
         return sum(
             (child._count_nodes() for child in self.children.values()),
-            start=len(self.children),
+            start=1,
         )
 
     def insert(self, word: str) -> bool:
