@@ -1,6 +1,9 @@
 import sys
-from threading import Lock
+from pprint import pprint
+from threading import Lock, RLock
 from typing import Dict, List, Union  # ruff:ignore[deprecated-import]
+
+rlock = RLock()
 
 
 class Trie:
@@ -11,6 +14,7 @@ class Trie:
         self._num_nodes = 0
         self.num_nodes_upto_date = True
         self.lock = Lock()
+        self.num_uniques = 0
 
     @property
     def node_count(self) -> int:
@@ -34,8 +38,37 @@ class Trie:
                 new_child = new_child.children.setdefault(c, Trie())
                 new_child.count += 1
             already_marked = new_child.is_end
+            if not already_marked:
+                self.num_uniques += 1
             new_child.is_end = True
             return already_marked
+
+    def delete(self, word: str) -> bool:
+        with self.lock:
+            deleted = False
+            self.num_nodes_upto_date = False
+            node = self.find_substr(word, complete=True)
+            if node is not None:
+                node.is_end = False
+                deleted = True
+                self.num_uniques -= 1
+            self.prune()
+            return deleted
+
+    def prune(self):
+        with rlock:
+            chars_to_delete = []
+            for char, child in self.children.items():
+                if child.is_end:
+                    continue
+                if not child.children:
+                    chars_to_delete.append(char)
+                else:
+                    child.prune()
+                    if not child.children:
+                        chars_to_delete.append(char)
+            for char in chars_to_delete:
+                del self.children[char]
 
     def find_substr(self, prefix: str, complete: bool = True) -> "Union[Trie, None]":  # ruff:ignore[non-pep604-annotation-union]
         child = self
@@ -67,6 +100,8 @@ class Trie:
     def contains(self, word: str) -> bool:
         return self.find_substr(word) is not None
 
+    __contains__ = contains
+
     def frequency(self, word: str) -> int:
         return node.count if (node := self.find_substr(word)) else 0
 
@@ -79,12 +114,9 @@ class Trie:
 class WordStore:
     def __init__(self):
         self._root = Trie()
-        self.num_uniques = 0
 
     def insert(self, word: str):
-        already_marked = self._root.insert(word)
-        if not already_marked:
-            self.num_uniques += 1
+        return self._root.insert(word)
 
     def contains(self, word: str):
         return self._root.contains(word)
@@ -98,8 +130,14 @@ class WordStore:
     def prefix_matches(self, prefix: str) -> List[str]:  # ruff:ignore[non-pep585-annotation]
         return self._root.prefix_matches(prefix)
 
+    def delete(self, word: str):
+        return self._root.delete(word)
+
+    def num_uniques(self) -> int:
+        return self._root.num_uniques
+
     def _inspect(self):
-        print(f"WordStore(_store={self._root}, nunique={self.num_uniques})")
+        pprint(f"WordStore(_store={self._root}, nunique={self.num_uniques()})")
 
 
 words = WordStore()
@@ -135,10 +173,12 @@ for line in filter(None, map(str.strip, sys.stdin)):
     elif cmd == "PREFIX":
         matches = words.prefix_matches(word)
         print(",".join(matches) if matches else "none")
+    elif cmd == "DELETE":
+        words.delete(word)
     elif cmd == "FREQ":
         print(words.frequency(word))
     elif cmd == "SIZE":
-        print(words.num_uniques)
+        print(words.num_uniques())
     elif cmd == "NODES":
         print(words.node_count())
     elif cmd == "DEBUG":
